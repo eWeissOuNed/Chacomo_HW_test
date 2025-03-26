@@ -44,6 +44,7 @@ static uint32_t duty_cycle = 512;   // Default duty cycle (50%)
 static adc_oneshot_unit_handle_t adc_handle;
 static int vehicle_state = 0;    // Default vehicle state is 0
 static int chacomo_state = 0;    // 0 -> chacomo is inactive, 1 -> chacomo is active
+static int connected_state = 0;       // 0 -> chacomo is not connected, 1 -> chacomo is connected
 
 void configure_pwm(void) {
     ledc_timer_config_t ledc_timer = {
@@ -108,14 +109,14 @@ void set_pwm_duty(uint32_t percent) {
     ESP_LOGI(TAG, "Updated PWM duty cycle to: %lu (from %lu%%)", (unsigned long)duty_cycle, (unsigned long)percent);
 }
 
-void set_vehicle_state(uint8_t voltage) {   //set vehicle state based on voltage
-    if(4.5 < voltage && voltage < 7.5) {
+void set_vehicle_state(float voltage) {   //set vehicle state based on voltage
+    if(4.5f < voltage && voltage <= 7.5f) {
         vehicle_state = 1;     
     }
-    else if(7.5 < voltage && voltage < 10.5) {
+    else if(7.5f < voltage && voltage <= 10.1f) {
         vehicle_state = 2;
     }
-    else if(10.5 < voltage && voltage < 13.5) {
+    else if(10.1f < voltage && voltage <= 13.5f) {
         vehicle_state = 3;
     }
     else {
@@ -208,11 +209,12 @@ void command_task(void *pvParameter) {
     }
 }
 
-void chacomo_task(void *pvParameters) {
+void chacomo_task(void *pvParameters) {   
     while (1) {
         if(chacomo_state == 1){
-            set_vehicle_state(read_adc_voltage());
-            ESP_LOGI(TAG, "Chacomo Task adc: %f", read_adc_voltage());
+            float temp_voltage = read_adc_voltage();
+            set_vehicle_state(temp_voltage);
+            ESP_LOGI(TAG, "Chacomo Task voltage: %.2f", temp_voltage);
             if(vehicle_state == 1) {
                 gpio_set_level(ZD1_GPIO, 0);
                 gpio_set_level(ZD2_GPIO, 1);
@@ -220,13 +222,26 @@ void chacomo_task(void *pvParameters) {
             if(vehicle_state == 2) {
                 gpio_set_level(ZD1_GPIO, 1);
                 gpio_set_level(ZD2_GPIO, 0);
-            }else {
+            }
+            if(vehicle_state == 3) {
                 gpio_set_level(ZD1_GPIO, 0);
                 gpio_set_level(ZD2_GPIO, 0);
             }
+            if(connected_state == 0) {
+                vTaskDelay(pdMS_TO_TICKS(100));  // Delay for 1000 ms
+                set_gpio_state(1);
+                vTaskDelay(pdMS_TO_TICKS(100));  // Delay for 1000 ms
+                connected_state = 1;
+            }
+        }else if(connected_state == 1) {
+            set_gpio_state(0);
+            vTaskDelay(pdMS_TO_TICKS(10));  // Delay for 1000 ms
+            gpio_set_level(ZD1_GPIO, 0);
+            gpio_set_level(ZD2_GPIO, 0);
+            connected_state = 0;
         }
         ESP_LOGI(TAG, "Chacomo Task Vehicle State: %d", vehicle_state);
-        vTaskDelay(pdMS_TO_TICKS(1000));  // Delay for 1000 ms
+        vTaskDelay(pdMS_TO_TICKS(100));  // Delay for 1000 ms
     }
 }
 
