@@ -97,7 +97,7 @@ void configure_adc(void) {
 float read_adc_voltage(void) {
     int adc_raw = 0;
     adc_oneshot_read(adc_handle, ANALOG_GPIO, &adc_raw);
-    return (adc_raw / ADC_MAX_VALUE) * ADC_REF_VOLTAGE  * 3.5641f;
+    return (adc_raw / ADC_MAX_VALUE) * ADC_REF_VOLTAGE  * 3.5641f;          // 3.5641 is the voltage divider factor
 }
 
 void set_pwm_duty(uint32_t percent) {
